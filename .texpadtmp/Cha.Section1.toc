@@ -1,4 +1,0 @@
-\beamer@sectionintoc {1}{Introduction/Logistics}{2}{0}{1}
-\beamer@sectionintoc {2}{Causation and Correlation}{9}{0}{2}
-\beamer@sectionintoc {3}{Difference-in-Difference}{21}{0}{3}
-\beamer@sectionintoc {4}{Instrumental Variables}{24}{0}{4}
