@@ -1,0 +1,229 @@
+---
+title: "Gov 51 Section"
+subtitle: "Regression and Penalties"
+author: Jeremiah Cha
+institute: Harvard University
+date: "`r Sys.Date()`"
+header-includes:
+- \usepackage{graphicx} 
+- \usepackage{booktabs} 
+- \usepackage[font=small,labelfont=bf]{caption}
+- \usepackage{tikz}
+- \usetikzlibrary{positioning}
+- \usepackage{booktabs}
+- \usepackage{siunitx}
+- \usepackage{float}
+- \usepackage{changepage}
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{bbm}
+- \usepackage{subcaption}
+- \usepackage{tabulary}
+- \usepackage{natbib}
+- \newcolumntype{d}{S[input-symbols = ()]}
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "beaver"
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rvest)
+
+bballref <- read_html("https://www.basketball-reference.com/leagues/NBA_2024.html")
+
+standings <- bballref |> 
+  html_elements("#per_game-team tbody td") |> 
+  html_text()
+
+statnames <- bballref |> 
+  html_elements("#per_game-team thead .center+ .center") |> 
+  html_text()
+
+nbadf <- matrix(standings, ncol = 24, byrow = TRUE) |> 
+  as_tibble() 
+
+names(nbadf) <- statnames
+
+standings2 <- bballref |> 
+  html_elements("#advanced-team tbody .right:nth-child(4) , #advanced-team tbody th+ .left") |>
+  html_text()
+
+wins <- matrix(standings2, ncol = 2, byrow = TRUE) |> 
+  as_tibble() |> 
+  rename("Team" = "V1",
+         "Wins" = "V2")
+
+nba <- nbadf |> 
+  left_join(wins, 
+            by = "Team") |> 
+  mutate(across(!"Team", as.numeric)) |> 
+  mutate(winpct = Wins/G) |> 
+  rename_with(tolower)
+```
+
+## Agenda
+
+- Housekeeping
+- Regression Review
+- Introduction to Penalized Regression
+- Problem Set Office Hours
+
+## Housekeeping
+
+- Problem Set I 
+  - Done!
+- CA Office Hours (Coding Questions)
+  - James Jolin: Wednesday 12:00PM-1:00PM & Thursday 1:30PM-2:30PM (First 20 open, Last 40 appointment basis)
+  - Jack Wyss: Wednesday 7:00PM-9:00PM
+
+## Regression 
+
+Gov 50 Notation: 
+$$Y_i = \alpha + \beta X_i + \epsilon_i$$
+
+Gov 51 Notation: 
+$$Y_i = \beta_0 + \beta_1 X_i + \epsilon_i$$
+
+- Linear regression models allow us to estimate the relationship (and the direction) between a \textbf{dependent variable} (outcome) and \textbf{independent variables} (covariates)
+
+## Betas
+
+- How do we determine which $\beta_0$ and $\beta_1$?
+  - In other words, which line do we choose? 
+\pause - We use \textbf{loss functions} to determine, which slope or $\beta$, fits our data best 
+- \textbf{Loss Functions}! Examples of loss functions from class
+  - Ordinary Least Squares (OLS)
+  - Absolute Deviation
+  - Penalized Least Squares
+- OLS has useful properties 
+  - \textbf{B}est \textbf{L}inear \textbf{U}nbiased \textbf{E}stimator
+  - Conditional on assumptions! 
+
+## Toy Data Example
+
+```{r}
+head(nba)[1:6]
+```
+
+
+## Regressions Using the NBA  
+
+```{r}
+model1 <- lm(winpct ~ tov, 
+             data = nba)
+
+summary(nba$tov)
+
+model1
+```
+
+
+
+## Turnovers and Win Percentage
+
+```{r, echo=FALSE, message=F, fig.width = 10, fig.height = 5}
+ggplot(nba, aes(tov, winpct)) + 
+  geom_point() + 
+  geom_smooth(method = "lm",
+              se = FALSE) + 
+  geom_text(aes(label=ifelse(winpct>0.6,as.character(team),'')),
+            hjust=-0.1,
+            vjust=0.2) + 
+  labs(x = "Turnovers",
+       y = "Win Percentage") + 
+  theme_bw() + 
+  theme(text = element_text(size = 20))
+```
+
+
+## Limits 
+
+- Using statistical packages, we can estimate linear regressions on any two variables
+  - Not all regressions are good regressions! 
+- Significant coefficients are NOT causal estimates without identification 
+
+## Multiple Regression
+
+- Why might we want to add more variables? 
+  - Better predictions
+  - Easier interpretations if we hold certain thing constant 
+- \textbf{Example}: What effect does incumbency have on reelection, conditional on scandals? 
+  - We might want to know the incumbency advantage holding scandals constant 
+  
+## Multiple Regression Implementation 
+
+- Implementation is similar to bivariate regression 
+- Bivariate Loss Function
+
+\begin{equation}
+\begin{aligned}
+\widehat \beta_1 &= \text{argmin}\sum_{i=1}^{N} (Y_i - \widehat Y_i)^2\\
+&= \text{argmin}\sum_{i=1}^{N} (Y_i - (\beta_0 + \beta_1 X_i))^2\\
+\end{aligned}
+\end{equation}
+
+- Multivariate Loss Function (Sum of Squared Residuals)
+
+\begin{equation}
+\begin{aligned}
+\widehat \beta_1 &= \text{argmin}\sum_{i=1}^{N} (Y_i - \widehat Y_i)^2\\
+&= \text{argmin}\sum_{i=1}^{N} (Y_i - (\beta_0 + \beta_1 X_1 + \beta_2 X_2))^2\\
+\end{aligned}
+\end{equation}
+
+## Regressions Using the NBA  
+
+```{r}
+model2 <- lm(winpct ~ tov + pf, 
+             data = nba)
+
+model2
+```
+
+
+## Concepts to Keep in Mind
+
+- `modelsummary` package to produce tables 
+- Hypothesis testing and $\beta$'s as random variables 
+  - Statistical significance
+  - Interpreting p-values
+
+
+## Why Penalized Regression? 
+
+- Problem: \textbf{overfitting}
+- \textbf{Overfitting}: a model that begins to describe the error in the data rather than relationships between variables 
+  - In other words, our model may have high internal validity, but it has extremely low external validity 
+  - We capture the relationships that are specific to our dataset and only our dataset
+- Particularly problematic if our variables are \textbf{collinear}
+  - \textbf{Collinearity} refers to high correlation between covariates 
+  - Makes it difficult to interpret our results!
+- \textbf{Example}: NBA!
+  - Points are in part determined by 3 pointer percentage, and free throws 
+  - Also probably related to blocks and steals; easier to score after good defense 
+
+## Why Penalized Regression in the NBA? 
+
+```{r}
+model3 = lm(winpct ~ pts + ast + fg + `3p%` + 
+              ft + trb + blk + stl, 
+            data = nba)
+
+model3
+```
+
+
+## Coming Up and Mini-OH
+
+- Implementation of penalized regression 
+  - Types of penalties
+- Uncertainty and Inference Review 
+- Mini-OH 
+  - Questions about Problem Set
+  - Questions about IV, Matching, Regression
+
+

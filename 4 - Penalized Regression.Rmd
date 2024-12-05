@@ -1,0 +1,222 @@
+---
+title: "Gov 51 Section"
+subtitle: "Penalized Regression"
+author: Jeremiah Cha
+institute: Harvard University
+date: "`r Sys.Date()`"
+header-includes:
+- \usepackage{graphicx} 
+- \usepackage{booktabs} 
+- \usepackage[font=small,labelfont=bf]{caption}
+- \usepackage{tikz}
+- \usetikzlibrary{positioning}
+- \usepackage{booktabs}
+- \usepackage{siunitx}
+- \usepackage{float}
+- \usepackage{changepage}
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{bbm}
+- \usepackage{subcaption}
+- \usepackage{tabulary}
+- \usepackage{natbib}
+- \newcolumntype{d}{S[input-symbols = ()]}
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "beaver"
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(rvest)
+library(ggthemes)
+
+bballref <- read_html("https://www.basketball-reference.com/leagues/NBA_2024.html")
+
+standings <- bballref |> 
+  html_elements("#per_game-team tbody td") |> 
+  html_text()
+
+statnames <- bballref |> 
+  html_elements("#per_game-team thead .center+ .center") |> 
+  html_text()
+
+nbadf <- matrix(standings, ncol = 24, byrow = TRUE) |> 
+  as_tibble() 
+
+names(nbadf) <- statnames
+
+standings2 <- bballref |> 
+  html_elements("#advanced-team tbody .right:nth-child(4) , #advanced-team tbody th+ .left") |>
+  html_text()
+
+wins <- matrix(standings2, ncol = 2, byrow = TRUE) |> 
+  as_tibble() |> 
+  rename("Team" = "V1",
+         "Wins" = "V2")
+
+nba <- nbadf |> 
+  left_join(wins, 
+            by = "Team") |> 
+  mutate(across(!"Team", as.numeric)) |> 
+  mutate(winpct = Wins/G) |> 
+  rename_with(tolower)
+```
+
+## Agenda
+
+- Lasso
+- Implementation of Lasso 
+
+## Issues with Regression
+
+- Regression allows us to estimate the relationship between two variables
+- \textbf{Problem:} How do we choose variables?
+
+1. Intuition - perhaps, we have prior knowledge about the relationship and think certain things affect outcomes
+2. Literature - perhaps, the scholarship tells us that there are things that are important 
+
+- \textbf{Problem 2:} What if we have lots and lots of variables? 
+  - \pause Intuition and the literature cannot really help us if we have 4500 variables 
+
+## Lasso
+
+- \textbf{Lasso} - Least absolute shrinkage and selection operator 
+- Similar to ordinary least squares regression by using a loss function to calculate $\widehat \beta$
+
+\begin{equation}
+  \widehat \beta = \underset{\widetilde \beta}{\text{argmin}} \frac{1}{2} \sum_{i=1}^N (Y_i - \widetilde \beta X)^2 + \boxed{\lambda |\widetilde \beta|}
+\end{equation}
+
+- Short version: Add a penalty term to our loss function to only keep relevant covariates in our model 
+  - Generally referred to shrinkage and regularization
+- Advantages of lasso is the ease of which to interpret its penalty: keep or drop 
+
+## Lasso Intuition 
+
+- Intuition from lecture: The size of the boxed term, $\lambda |\widetilde \beta|$, determines the penalty size, or how stringent lasso is
+  - If a beta coefficient is insufficiently large, it goes to zero (e.g. dropped)
+  - If lambda is too large, we exclude everything 
+  - What happens if lambda is zero? 
+
+## Toy Example
+
+```{r, echo=FALSE, message=FALSE}
+library(glmnet)
+set.seed(02138)
+
+nba_data <- as.matrix(nba[, -c(1,25,26)])
+winning <- as.matrix(nba[, c(25)])
+```
+
+Variable names are respectively field goals, field goal percentage, 3 pointers made, total rebounds, minutes played, field goals attempted, 3 pointers attempted, 3 point percentage, 2 pointers made, 2 pointers attempted, 2 pointer percentage, free throws made, free throws attempted, free throw percentage, offensive rebounds, defensive rebounds, assists, steals, blocks, turnovers, personal fouls, points, conference dummy
+
+Or...
+
+`r names(nba_data)`
+
+\textbf{What factors contribute to winning basketball?}
+
+## Lassoing some Lambdas
+
+```{r, echo=FALSE, message=FALSE}
+lasso <- glmnet(x = nba_data, 
+                y = winning)
+
+# sum absolute values of the betas
+sum_beta <- colSums(abs(lasso$beta))
+
+# plot against values of lambda
+plot(sum_beta ~ lasso$lambda, 
+     pch=16, 
+     col="dodgerblue1",
+     ylab = expression(sum(beta)),
+     xlab = expression(lambda))
+```
+
+## Lasso Coefficients
+
+```{r, echo=FALSE, message=FALSE}
+library(plotmo)
+plot_glmnet(lasso)
+```
+
+## Issues with Lasso
+
+- Researchers can choose $\lambda$ - theoretically, infinite models and infinite results, so opportunity to cherry pick 
+- OLS gives us \textbf{B}est \textbf{L}inear \textbf{U}nbiased \textbf{E}stimator with relatively limited assumptions (e.g. linearity, conditional mean = zero, independence of error)
+  - In short, if all our OLS assumptions are met, regularization and shrinkage methods will bias our estimates 
+- Lasso does NOT have a closed-form solution because of matrix limitations 
+  - Ridge regression, another shrinkage/regularization method, does 
+
+## Implementation of Lasso
+
+```{r, eval=FALSE}
+library(glmnet)
+
+nba_data <- as.matrix(nba[, -c(1,25,26)])
+winning <- as.matrix(nba[, c(25)])
+
+lasso <- glmnet(x = nba_data, 
+                y = winning)
+
+# sum absolute values of the betas
+sum_beta <- colSums(abs(lasso$beta))
+
+```
+
+## Sum of Betas against Lambda
+
+```{r, fig.height=5}
+# plot against values of lambda
+plot(sum_beta ~ lasso$lambda, 
+     pch=16, 
+     col="dodgerblue1",
+     ylab = expression(sum(beta)),
+     xlab = expression(lambda))
+```
+
+## Coefficient estimates against Lambda
+
+```{r, message=FALSE, fig.height=5}
+library(plotmo)
+plot_glmnet(lasso)
+```
+
+## What Lambda to Choose? 
+
+- Outside the scope of the class, but known as K-fold cross validation 
+  - In summary, minimizes the mean squared error to find the right lambda
+- `glmnet` allows us to implement this calculation
+
+```{r}
+lasso.cv <- cv.glmnet(x = as.matrix(nba_data),
+                      y = winning)
+
+lasso.cv$lambda.min
+```
+
+
+## Coefficient Estimates
+
+\tiny
+
+```{r}
+coef(lasso, 
+     s = lasso.cv$lambda.min)
+```
+
+\normalsize
+
+## Lasso Summary and Comments
+
+- Lasso is an estimation technique, not an identification technique
+  - Useful for obtaining more consistent estimates, as was matching, but not sufficient for causal identification
+- Tackles two problems: high-dimensionality and overfitting
+  - Better than ridge regression by making penalties easier to understand: keep or drop 
+  - However, can induce bias if OLS assumptions are met 
+- Other implementations of Lasso 
+  - Urminsky, Hansen, and Chernozhukov (2016) have a method known as double selection lasso, which attempts to control for differential treatment assignment 

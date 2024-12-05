@@ -1,0 +1,286 @@
+---
+title: "Gov 51 Section"
+subtitle: "Hypothesis Testing"
+author: Jeremiah Cha
+institute: Harvard University
+date: "`r Sys.Date()`"
+header-includes:
+- \usepackage{graphicx} 
+- \usepackage{booktabs} 
+- \usepackage[font=small,labelfont=bf]{caption}
+- \usepackage{tikz}
+- \usetikzlibrary{positioning}
+- \usepackage{booktabs}
+- \usepackage{siunitx}
+- \usepackage{float}
+- \usepackage{changepage}
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{bbm}
+- \usepackage{subcaption}
+- \usepackage{tabulary}
+- \usepackage{natbib}
+- \newcolumntype{d}{S[input-symbols = ()]}
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "beaver"
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(haven)
+library(modelsummary)
+
+cand20 <- read_dta("candidates_2006-2020.dta") |> 
+  filter(office == "H",
+         year == 2020) |> 
+  mutate(voteshare = candidatevotes/totalvotes) |> 
+  select(name_snyder, voteshare, won, inc)
+```
+
+## Agenda
+  
+- Housekeeping
+- Hypothesis Testing Review
+- Conclusion
+
+## Housekeeping
+
+- Remember to Slack me if Professor Liu asks \textbf{during lecture!}
+- Final groups should be assigned
+  - OH if you have questions 
+- Midterm Review $\rightarrow$ March 1st 1:00 PM - 3:00 PM
+- Midterm $\rightarrow$ March 7th 
+  - 50% Conceptual + 50% Coding 
+
+## Regression Again
+
+- Linear regression helps us estimate the relationship between two variables 
+- \textbf{Problem:} how do we know our results are not just due to randomness? 
+- In our regression notation, how sure can we be of our $\widehat \beta_0$ and $\widehat \beta_1$ estimates match up to $\beta_0$ and  $\beta_1$? 
+
+## How do we read the table? 
+
+```{r, echo=FALSE}
+model <- lm(voteshare ~ inc, data = cand20)
+```
+\small
+```{r, echo=FALSE}
+modelsummary(model,
+             stars = T,
+             gof_omit = 'DF|Deviance|AIC|BIC')
+```
+
+## Statistical Hypothesis Testing
+
+- \textbf{Solution}: Hypothesis Testing!
+  - A statistical thought experiment that compares what would have happened to what did happen 
+- Some concepts
+  - Null hypothesis ($H_0$): "a hypothesis we would like to refute" (Imai 2017)
+    - "some statement about the population parameters" (Blackwell 2022)
+  - Alternative hypothesis ($H_1$ or $H_2$ or $H_3$...): a hypothesis we would like to prove 
+    - "the statement we hope or suspect is true" (Blackwell 2022)
+
+## Example of Null and Alternative Hypotheses
+
+\textbf{Question:} What is the effect of incumbency on vote share? 
+
+$H_0$: A candidate's vote share would not change depending on incumbency status
+
+\centering $\widehat \beta_1 = \overline Y(1) - \overline Y(0) = 0$
+
+$H_1$: A candidate's vote share would change depending on incumbency status 
+
+\centering $\widehat \beta_ 1 = \overline Y(1) - \overline Y(0) \neq 0$
+
+## Null Distribution 
+
+- Now, we need to try to disprove the null hypothesis to argue there is a treatment effect. 
+- Let's assume the null hypothesis is true - what values of $\widehat \beta_1$ disprove it? 
+  - \pause We can sort of guess - probably not scientific
+  - \pause We can set a cutoff - also probably not very systematic
+- \pause We can simulate!
+
+1. Specify a null hypothesis 
+2. Use our existing data, namely variation, to estimate likely values we might get
+
+## Null Distribution
+
+- Random variables, like our $\widehat \beta_1$, have nice properties!  
+  - The distribution of averages (or expectations) approximate to a \textbf{normal distribution}
+  - So, simulating can give us a rough idea of what values to expect under the null hypothesis
+- This is also known as the Central Limit Theorem 
+  - Decomposition is outside the scope of this course
+
+## Example Normal Distribution 
+
+```{r, echo=F, fig.height = 6}
+set.seed(02138)
+df <- tibble(value = rnorm(n = 10000))
+ggplot(df, aes(x = value)) + 
+  geom_density(fill = "dodgerblue", alpha = 0.5) +
+  theme_bw() + 
+  theme(text = element_text(size = 20))
+```
+
+## p-value 
+
+- We have a distribution of $\widehat \beta_1$ values under the null - now what? 
+- We generally reject the null, when our estimates are at some extremity in the null distribution 
+- \textbf{p-value}: the probability under the null hypothesis, we observe data as extreme as ours
+- As a scientific community, we have some arbitrary cutoffs to reject the null 
+  - p < .05 $\approx$ *
+  - p < .01 $\approx$ **
+  - p < .001 $\approx$ ***
+- Norms change - in the past, p < .1 was considered significant, but lower bound is now p < .05
+- Relationship between p-value and $\alpha$
+
+## p < .05
+
+```{r, echo=F, fig.height = 6}
+ggplot(df, aes(x = value)) + 
+  geom_density() +
+  geom_vline(aes(xintercept = quantile(value, .975)), color = "red") + 
+  geom_vline(aes(xintercept = quantile(value, .025)), color = "red") + 
+  theme_bw() + 
+  theme(text = element_text(size = 20))
+```
+
+## p < .01
+
+```{r, echo=F, fig.height = 6}
+ggplot(df, aes(x = value)) + 
+  geom_density() +
+  geom_vline(aes(xintercept = quantile(value, .975)), color = "red") + 
+  geom_vline(aes(xintercept = quantile(value, .025)), color = "red") + 
+  geom_vline(aes(xintercept = quantile(value, 0.995)), color = "blue") + 
+  geom_vline(aes(xintercept = quantile(value, 0.005)), color = "blue") + 
+  theme_bw() + 
+  theme(text = element_text(size = 20))
+```
+
+## p < .001
+
+```{r, echo=F, fig.height = 6}
+ggplot(df, aes(x = value)) + 
+  geom_density() +
+  geom_vline(aes(xintercept = quantile(value, .975)), color = "red") + 
+  geom_vline(aes(xintercept = quantile(value, .025)), color = "red") + 
+  geom_vline(aes(xintercept = quantile(value, 0.995)), color = "blue") + 
+  geom_vline(aes(xintercept = quantile(value, 0.005)), color = "blue") + 
+  geom_vline(aes(xintercept = quantile(value, 0.9995)), color = "black") + 
+  geom_vline(aes(xintercept = quantile(value, 1-0.9995)), color = "black") + 
+  theme_bw() + 
+  theme(text = element_text(size = 20))
+```
+
+## Estimating the Null for CAGE
+
+```{r, echo = FALSE, fig.height = 4.5}
+set.seed(02138)
+
+null_dist <- rt(20000,
+                df = 1153)
+model <- lm(voteshare ~ inc,
+            data = cand20)
+
+var_hat <- (sum(model$residuals^2)/1152)
+
+null_dist <- null_dist*sqrt((var_hat/var(cand20$inc))/1154)
+upperb <- quantile(null_dist, .975)
+lowerb <- quantile(null_dist, .025)
+
+df <- tibble(value = null_dist)
+
+ggplot(df, aes (x = value)) + 
+  geom_density() + 
+  geom_vline(aes(xintercept = quantile(value, .975)), color = "red") + 
+  geom_vline(aes(xintercept = quantile(value, .025)), color = "red") + 
+  labs(x = expression(widehat(beta)[1])) + 
+  theme_bw() + 
+  theme(text = element_text(size = 20))
+```
+
+
+- Back to our incumbency question, what estimate of a treatment effect is sufficient to reject the null? 
+  - If our estimate is positive, `r upperb` is a sufficient $\beta_1$ 
+- Instead of a normal, we use a Student T-Distribution, which is a bit more conservative
+
+## In Table Form 
+
+```{r, eval=FALSE}
+model <- lm(voteshare ~ inc, data = cand20)
+summary(model)
+```
+\small
+```{r, echo=FALSE}
+modelsummary(model,
+             stars = T,
+             gof_omit = 'DF|Deviance|AIC|BIC')
+```
+
+## Error Types
+
+- Type I Error: Reject null hypothesis when it is true (False Positive)
+- Type II Error: Accept the null when it is false (False Negative) 
+- What situations might Type I or Type II errors be worse? 
+
+## Quick Recap 
+
+- Hypothesis testing provides a framework to evaluate $\widehat \beta$ point estimates
+  - Provides evidence against the null hypothesis of no effect
+- Relies on properties, namely the Central Limit Theorem, to estimate a null distribution 
+- We can use cut-offs to determine when it seems reasonable to reject a null hypothesis 
+
+
+## Drawbacks to Our Example
+
+- Confounders in relationship between incumbency and vote share 
+  - Strategic behavior by politicians (e.g. time to retire!)
+  - Strategic behavior by challengers (e.g. good challengers wait till retirement)
+- Is it identified? \pause No
+  - Further reading Gelman and King (1990), Levitt and Wolfram (1997), Ansolabehere, Snyder, and Stewart (2000)
+  
+## Quick Note on Bias Variance
+
+- Decomposition from lecture 
+
+1. If we increase a complexity of our model, our predictions might be better in-sample, but overfitting concerns (e.g. biased estimate, but low variance)
+2. If we decrease the complexity of our model, our predictions might be worse in-sample, but probably fit out-of-sample observations better (e.g. high variance, but low bias)
+
+- Similar flavor of a problem from Lasso unit 
+
+## Implementation in R for Regression 
+
+- Mean squared error is a combination of our variance and bias 
+  - Decomposition gets us a bias quantity that includes an impossible to know parameter $\beta$
+- We can use an estimator to get our best estimate
+
+```{r}
+mean(model$residuals^2)
+```
+
+
+## Notation 
+
+$$
+\begin{aligned}
+Y_i &= \beta_0 + \beta_1 X_i + \epsilon_i \rightarrow \text{True } \beta\text{'s}\\
+Y_i &= \boxed{\widehat \beta_0 + \widehat \beta_1 X_i} + \epsilon_i \rightarrow \text{Estimated } \beta\text{'s}\\
+\widehat Y_i &= \boxed{\widehat \beta_0 + \widehat \beta_1 X_i} \rightarrow \text{Relationship between Estimated } \beta\text{'s and Predicted } \widehat Y_i
+\end{aligned}
+$$
+
+
+## Concluding Remarks
+
+- Hypothesis testing is incredibly important! 
+  - We can use it to contextualize our effect estimates in OLS 
+- Types of errors we can make with hypothesis testing
+- Bias and variance make up Mean Squared Error - their tradeoff
+- Midterm - March 7th! 
+- Review - March 1st! 
+  - CGIS K105

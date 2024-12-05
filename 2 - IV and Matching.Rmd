@@ -1,0 +1,318 @@
+---
+title: "Gov 51 Section"
+subtitle: "Week 2: IV and Matching"
+author: Jeremiah Cha
+institute: Harvard University
+header-includes:
+- \usepackage{graphicx} 
+- \usepackage{booktabs} 
+- \usepackage[font=small,labelfont=bf]{caption}
+- \usepackage{tikz}
+- \usetikzlibrary{positioning}
+- \usepackage{booktabs}
+- \usepackage{siunitx}
+- \usepackage{float}
+- \usepackage{changepage}
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{bbm}
+- \usepackage{subcaption}
+- \usepackage{tabulary}
+- \usepackage{natbib}
+- \newcolumntype{d}{S[input-symbols = ()]}
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "beaver"
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Agenda
+
+- R Crash Course 
+- IV Review
+- Matching
+
+## Using R Scripts
+
+- R Scripts are different than R Markdown files 
+- R Markdown files are often used to generate documents, BUT 
+  - Not all coding requires a generation of a PDF 
+  - May actually hinder our code 
+- If you want to run a line of code in a script, you don't need to click Run! 
+  - Mac: Click on the line of interest, CMD + Return
+  - Windows: Click on the line of interest, Ctrl + Enter
+- Scripts allow us to save our code, AND run the functions in our console
+
+## Working Directories
+
+- You must tell R where your files are, or where your "working directory" is 
+- `getwd()` and `setwd()`, respectively, "get" your working directory and "set" your working directory
+- If you get an error along the lines of "Cannot establish connection....," it is because you are loading in data that is not in your working directory
+- You can either set your working directory through code
+
+```{r, eval=FALSE}
+setwd("/Users/jeremiahcha/Desktop/gov51")
+```
+
+- OR click Session -> Set Working Directory -> Choose Directory
+- R Projects set your working directory to the folder that it is in 
+
+## Loading Data from a URL 
+
+- You can also load in data easily from the course website if you have an internet connection 
+
+```{r, eval=FALSE}
+url <- "https://naijialiu.github.io/Gov_51/Causal/simulated_iv.csv"
+d <- read.csv(url)
+```
+
+## Advantages and Disadvantages of Tidyverse
+
+- Functions
+  - Advantages: Efficient recall of variable names, consistent within the Tidyverse universe, some unique data wrangling functions
+  - Disadvantages: Clunky in function creation, reliance on package functions
+- Pedagogical 
+  - Advantages: More and more conventional in professional world
+  - Disadvantages: \textbf{Reliance on package functions} - think a calculator before learning basic arithmetic 
+  
+## Grammar of Base R 
+
+- Some basic functions and their tidyverse equivalents 
+
+```{r, eval=FALSE}
+# Creating new variable
+df$newvar <- 1:10 
+
+df <- df |> 
+  mutate(newvar = 1:10)
+
+# Creating a conditional new variable 
+df$newvar2 <- ifelse(df$newvar %% 2 == 0, 
+                     1, 
+                     0) 
+
+df <- df |> 
+  mutate(newvar2 = ifelse(df$newvar %% 2 == 0,
+                          1,
+                          0))
+```
+
+## Tidyverse Guide to Base R
+
+\url{https://dplyr.tidyverse.org/articles/base.html}
+
+## R Crash Course
+
+- Questions? 
+
+## IV Review
+
+- Identification means that we can \textbf{isolate or identify} a treatment effect 
+- If there are confounding variables that affect both the treatment assignment and outcome, we cannot causally attribute any outcomes to the treatment. 
+- Example: Our estimand of interest is the effect of voter turnout on Democratic vote share 
+  - Confounder: Strategic voters - voters might only turn out if they think Democrats can win!
+  - Our estimates may only tell us the effect of \underline{strategic} voter turnout when Democrats are \underline{favored/unfavored}
+  - Instead of the effect of turnout on Democratic vote share, we are probably capturing some measure of Democratic strength
+- What can we do to achieve identification? 
+  
+## IV Review
+
+- We can instrument in order to capture variation in voter turnout \textbf{independent} of strategic voting 
+
+1. Randomization: Rain is assigned as-if random to districts 
+2. First-stage: Rain depresses voter turnout
+3. Exclusion-Restriction: Rain only affects Democratic vote share through voter turnout
+4. Monotonicity: Rain does not increase voter turnout 
+
+- Intuition: Candidate strength in any given election does not affect the variation in turnout caused by rain. 
+  - Rain assigns treatment as-if random, as opposed to just looking at voter turnout 
+
+## Estimation 
+
+- We use variation caused by rain to create "artificial" values of turnout that are only affected by rain 
+- Approaches introduced: 
+
+1. Introduced 2SLS in section - will build on this in regression 
+2. \textbf{Wald Estimator}
+
+## IV Estimation Using Wald
+
+- Wald Estimator estimates the Local Average Treatment Effect among compliers
+
+$$
+\begin{aligned}
+\frac{\widehat {\text{ITT}}}{\widehat {\text{Encouragement}}} &= \frac{E[Y_i(Z_i = 1)] - E[Y_i(Z_i = 0))]}{E[T_i(Z_i = 1)] - E[T_i(Z_i = 0)]}
+\end{aligned}
+$$
+
+- Let's try to get a Wald estimate using a simulated dataset of a military draft and earnings
+
+## Wald Estimation in R
+
+```{r, include=FALSE}
+set.seed(02138)
+mydf <- data.frame(draft = rbinom(20, 1, 0.5),
+                   military = rbinom(20, 1, 0.3),
+                   earning = rnorm(20, 10000, sd = 5000))
+
+```
+
+```{r}
+summary(mydf)
+dim(mydf)
+```
+
+## Wald Estimation in R
+
+$$
+\begin{aligned}
+\frac{\widehat {\text{ITT}}}{\widehat {\text{Encouragement}}} &= \frac{E[Y_i(Z_i = 1)] - E[Y_i(Z_i = 0))]}{E[T_i(Z_i = 1)] - E[T_i(Z_i = 0)]}
+\end{aligned}
+$$
+
+```{r}
+ITT <- mean(mydf$earning[mydf$draft == 1]) - 
+  mean(mydf$earning[mydf$draft == 0])
+Encouragement <- mean(mydf$military[mydf$draft == 1]) - 
+  mean(mydf$military[mydf$draft == 0])
+tauhat <- ITT/Encouragement
+```
+
+Our estimate of the effect of military service on lifetime earnings (for compliers) is `r round(tauhat,2)`. 
+
+## Difference in Means Comparison 
+
+- Let's compare our LATE estimate to one that we get from a difference in means analysis  
+
+```{r}
+milearn <- mean(mydf$earning[mydf$military == 1])
+nonmilearn <- mean(mydf$earning[mydf$military == 0])
+
+didtau <- milearn - nonmilearn 
+```
+
+Our estimate of the effect of military service on lifetime earnings is `r round(didtau,2)`
+
+## IV Wrap-up 
+
+- Endogeneity concerns are real! Our estimates of military service on lifetime earnings are clearly affected by confounding variables 
+- Instrumental variables are a useful strategy to achieve identification of an estimand 
+- Finding a good instrument is difficult, as the assumptions are stringent 
+
+## Mixing and Matching
+
+- What if there are no valid/strong instruments? What if parallel trends also does not hold up? 
+- Matching refers to a class of methodologies that pair up similar observations to calculate an average treatment effect for the treated (untreated)
+- Why not just an average treatment effect?
+
+## GOTV Data 
+
+- Let's used a simulated dataset of a get-out-the-vote (GOTV) campaign that uses mailers
+- Our goal is to estimate the effect of mailers on turnout 
+
+```{r, include=FALSE}
+set.seed(02138)
+gotv <- data.frame(turnout = rbinom(100, 1, 0.4),
+                   mailer = rbinom(50, 1, 0.4),
+                   age = sample(18:99, 100, replace = TRUE),
+                   voted96 = rbinom(100, 1, 0.4),
+                   newvote = rbinom(100, 1, 0.2),
+                   dem = rbinom(100, 1, 0.5),
+                   white = rbinom(100, 1, 0.5))
+```
+
+```{r}
+names(gotv)[1:4]
+names(gotv)[5:7]
+dim(gotv)
+```
+
+## Differences by Treatment
+
+```{r, include=FALSE}
+diff <- data.frame(control = apply(gotv[gotv$mailer == 0,], 2, mean, na.rm = TRUE),
+           treatment = apply(gotv[gotv$mailer == 1,], 2, mean, na.rm = TRUE))
+
+diff$difference <- diff$treatment - diff$control
+```
+
+```{r}
+diff
+```
+
+## Matching using MatchIt
+
+```{r}
+library(MatchIt) 
+
+m.out <- matchit(mailer ~ age + voted96 + newvote + 
+                   dem, 
+                 data = gotv,
+                 distance = "mahalanobis", 
+                 replace = TRUE,
+                 exact = ~white)
+
+matchsum <- summary(m.out)
+```
+
+## Data Output of Matching
+
+```{r}
+matchsum$nn
+```
+
+## Comparing Treatment and Control Post-Match
+
+```{r}
+matchsum$sum.matched[,1:3]
+```
+
+## Matched Data and ATT
+
+```{r}
+m.data <- match.data(m.out)
+
+att <- sum(m.data$turnout[m.data$mailer == 1])/
+  sum(m.data$mailer == 1) - 
+  sum(m.data$turnout[m.data$mailer==0])/
+  sum(m.data$mailer == 0)
+
+dim_df <- mean(gotv$turnout[gotv$mailer == 1]) - 
+  mean(gotv$turnout[gotv$mailer == 0])
+```
+
+The average treatment effect on the treated is `r round(att,2)`. If we did not match, our estimate would be `r round(dim_df, 2)`
+
+## Visualization
+
+```{r}
+plot(m.out, type = "density", interactive = FALSE,
+     which.xs = ~age + voted96)
+```
+
+## Visualization Con't
+
+```{r}
+plot(m.out, type = "density", interactive = FALSE,
+     which.xs = ~newvote + white)
+```
+
+## Why match? 
+
+- We might think there are characteristics that affect the assignment of treatment, so we want to isolate the effect by matching to as close to a clone as we can 
+- If we conducted this experiment, why wouldn't randomization be sufficient? 
+- \pause Sometimes no! Gerber and Green (2000) was the original paper on mailers and turnout
+- Imai (2005) found that their randomization wasn't clean (e.g. vendor mistakes, too many treatments)
+  - Thus, Gerber and Green (2000) could not employ an IV because they did not meet the first assumption of IV 
+  - Imai (2005) instead calculated an ATT by matching treated units to their closest match 
+  
+## Concluding Thoughts
+
+- Questions about IV and Matching - OH! 
+- Problem Set I is coming! 
+- James and Jack are available for conversions between Base and Tidy! 

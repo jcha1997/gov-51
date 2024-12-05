@@ -1,0 +1,210 @@
+---
+title: "Gov 51 Section"
+subtitle: "Text as Data"
+author: Jeremiah Cha
+institute: Harvard University
+date: "`r Sys.Date()`"
+header-includes:
+- \usepackage{graphicx} 
+- \usepackage{booktabs} 
+- \usepackage[font=small,labelfont=bf]{caption}
+- \usepackage{tikz}
+- \usetikzlibrary{positioning}
+- \usepackage{booktabs}
+- \usepackage{siunitx}
+- \usepackage{float}
+- \usepackage{changepage}
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{bbm}
+- \usepackage{subcaption}
+- \usepackage{tabulary}
+- \usepackage{natbib}
+- \newcolumntype{d}{S[input-symbols = ()]}
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "beaver"
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(plyr)
+library(latex2exp)
+```
+
+## Agenda
+  
+- Housekeeping
+- Missing Data Implementation
+- Text as Data
+
+## Housekeeping
+
+- Remember to sign-up for office hours with me or Professor Liu as a group to discuss projects
+
+## Missing Data Implementation 
+
+- `mice` package - ``Multiple Imputation by Chained Equations''
+
+```{r, warning=F, message=F}
+library(mice)
+library(NHANES)
+
+data(NHANES)
+nhanes <- NHANES[c("Age", "SmokeNow", "TotChol")]
+```
+
+
+## Patterns 
+
+\centering
+```{r, out.height = "6cm"}
+md.pattern(nhanes)
+```
+
+## Multiple Imputation
+
+```{r, results="hide"}
+# m specifies the number of imputation cycles
+nhanes2MI5 <- mice(nhanes, m = 5)
+```
+
+```{r}
+# exports complete data with imputations 
+df <- complete(nhanes2MI5, 5)
+```
+
+
+## Evaluating Imputation 
+
+```{r, out.height = "6cm"}
+stripplot(nhanes2MI5, TotChol ~ .imp, 
+          col = c("grey", mdc(2)),
+          pch = c(1,20))
+```
+
+## Regressions with Imputed Data
+
+```{r}
+model1 <- lm(TotChol ~ Age + SmokeNow,
+             data = df)
+```
+
+```{r, echo=F, warning=F, message=F}
+library(modelsummary)
+modelsummary(model1,
+             stars = T,
+             gof_omit = 'DF|Deviance|AIC|BIC|F|Log.Lik.|RMSE')
+```
+
+## Comparing with Listwise Deletion
+
+```{r}
+model2 <- lm(TotChol ~ Age + SmokeNow,
+             data = nhanes)
+```
+
+```{r, echo=F, warning=F, message=F}
+library(modelsummary)
+modelsummary(model2,
+             stars = T,
+             gof_omit = 'DF|Deviance|AIC|BIC|F|Log.Lik.|RMSE')
+```
+
+## Multiple Imputation
+
+Questions? 
+
+## Text as Data
+
+- A large goal of this course is to give you a framework to understand different methodologies and the challenges they tackle
+- Missing data \pause $\rightarrow$ types of missingness drives our solutions
+- Text as data $\rightarrow$ ? \pause
+
+## Examples in Political Science
+
+- Ban, Grimmer, Kaslovsky, and West (2022) - committee hearings and the effect of women in Congress
+  - Finds that less interruptions with more women, more substantive conversations 
+- King, Pan, and Roberts (2013) - social media in censored contexts 
+  - Censorship in China does not target individual criticisms, but instead attempts at collective action 
+- \pause Communication relies on or can be represented by text - many political applications! 
+
+## Data Generating Process
+
+- How do we come up with sentences? \pause
+- One theory is that given a topic (or multiple!), there is a certain probability that words appear 
+- In a given \textit{document}, there could be a number of topics 
+  - Sushi, representation, legislative branch, Felipe's
+- Those topics then dictate the likelihood of which words appear
+  - Tuna will probably show up in a document about sushi rather than the legislative branch 
+  - \pause "Feels like this could be better" could show up when talking about the legislative branch and Felipe's
+- Pretty rigid framework, but some ground truth 
+  - We just do the probability weighting implicitly and incredibly quickly 
+- Also undergirds the logic under Chat GPT and other large language models (LLMs)
+  - Why GPTZero and other programs are easily able to detect because text generated using this framework is rigid! s
+
+## Bag of Words Model
+
+- Where do we begin in analysis? 
+- \pause One of the most common models is \textit{bag-of-words}
+- Text is just a collection of words - the order and structure do not matter particularly when we want to get information like topical relevancy
+  - Hence, bag-of-words
+- Assumption is that the frequency of words can provide us information about the context in the text
+
+## Process
+
+- Tokenization - dividing text into individual words
+  - Preprocessing - cleaning, stemming, lemmatization 
+- Counting - counting the frequency they show up 
+- Vectorization - representing the text as a vector of word frequencies 
+
+## Example 
+
+\centering
+
+\includegraphics[width=\textwidth]{slideinputs/tiktok.png}
+
+## Example
+
+``Does TikTok access the home Wi-Fi Network'' - Richard Hudson (R-NC)
+
+``Tiktok is fun'' - Jeremiah Cha (Not in Congress-CA)
+
+## Example Table
+
+\begin{table}[]
+\begin{tabular}{l|lllllllll}
+i & Does & TikTok & access & the & home & Wi-Fi & network & is & fun \\ \hline
+1 & 1    & 1      & 1      & 1   & 1    & 1     & 1       & 0  & 0   \\
+2 & 0    & 1      & 0      & 0   & 0    & 0     & 0       & 1  & 1  
+\end{tabular}
+\end{table}
+
+## Applications
+
+1. Topic modeling
+2. Sentiment analysis 
+3. Text classification
+
+- Also a great application of Lasso, since data can get VERY large
+
+## Topic Modeling as an Example
+
+- Can be supervised or unsupervised
+- Oftentimes, will require some human interpretation of the generated categories 
+- Incredibly useful method particularly since text appears in huge datasets 
+- Terman (2017) - portrayals of Muslim woman in American media
+  - ``The results suggest that US news media propagate the perception that Muslims are distinctly sexist. This, in turn, may shape public attitudes toward Muslims, as well as influence policies that involve Muslims at home and abroad.''
+
+## Summary
+
+- Multiple imputation is easily implemented through the `mice` package
+  - Introduces a number of easy to use functions that help with descriptive statistics and modeling
+- Text as data is incredibly popular and powerful tools in social science
+- Data generating process of text is an important foundation for understanding how to tackle text as data
+- Bag-of-words is a simple, but powerful model to analyze text 
+- Remember to schedule a meeting - this is a \textbf{requirement} for the final paper! 

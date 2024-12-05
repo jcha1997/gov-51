@@ -1,0 +1,178 @@
+---
+title: "Gov 51 Section"
+subtitle: "Wrapping Up"
+author: Jeremiah Cha
+institute: Harvard University
+date: "`r Sys.Date()`"
+header-includes:
+- \usepackage{graphicx} 
+- \usepackage{booktabs} 
+- \usepackage[font=small,labelfont=bf]{caption}
+- \usepackage{tikz}
+- \usetikzlibrary{positioning}
+- \usepackage{booktabs}
+- \usepackage{siunitx}
+- \usepackage{float}
+- \usepackage{changepage}
+- \usepackage{mathtools}
+- \usepackage{amsmath}
+- \usepackage{bbm}
+- \usepackage{subcaption}
+- \usepackage{tabulary}
+- \usepackage{natbib}
+- \newcolumntype{d}{S[input-symbols = ()]}
+output: 
+  beamer_presentation:
+    theme: "Madrid"
+    colortheme: "beaver"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+```
+
+## Agenda
+
+- Housekeeping
+- Text as Data: A Code-Along
+- Office Hours
+
+## Housekeeping
+
+- Reminder of deadlines
+    - April 18th $\rightarrow$ final draft of poster
+    - April 23th $\rightarrow$ poster session
+
+## Housekeeping
+
+- Fill out your course evaluations!
+- They help us course correct and adjust for future students
+- ``Women and instructors of color are systematically rated lower in their teaching evaluations than white men, even when there are no actual differences in the instruction or in what students have learned."
+- ``As you fill out the course evaluation please keep this in mind and make an effort to resist stereotypes about professors. Focus on your opinions about the content of the course (the assignments, the textbook, the in-class material) and not unrelated matters (the instructor’s appearance)."
+
+\hfill Peterson, Biederman, Andersen, Ditonto, and Roe (2019)
+
+## Page Rank
+
+- The page rank algorithm refers to the search indexing algorithm patented by Larry Page and Sergiy Brin
+- Intuition:
+  - A web surfer will start at a random start point and end up at different pages by clicking links in a page 
+  - The times the web surfer ends up at a page is counted and then divided by the total count of visits 
+  - Result $\rightarrow$ a measure of page importance
+- We can apply this to text! 
+
+## Recalling our Data
+
+```{r, echo=F, message=F, warning=F}
+library(SnowballC)
+library(tm)
+df <- read.csv("data/harvardgov.csv")
+corpus <- Corpus(VectorSource(df$bio))
+# make everything lowercase
+corpus <- tm_map(corpus, content_transformer(tolower))
+
+# remove white space (e.g. spaces)
+corpus <- tm_map(corpus, stripWhitespace)
+
+# remove numbers
+corpus <- tm_map(corpus, removeNumbers)
+
+# remove stopwords
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+
+# stem words (e.g. remove "ing")
+corpus <- tm_map(corpus, stemDocument)
+
+corpus <- tm_map(corpus, removePunctuation)
+
+# Turning into a document term matrix
+dtm <- DocumentTermMatrix(corpus)
+dtm.mat <- as.matrix(dtm)
+
+# Adding labels to each document
+rownames(dtm.mat) <- df$prof
+
+# Normalize by document size 
+tfidf <- weightTfIdf(dtm, normalize = TRUE) 
+tfidf.mat <- as.matrix(tfidf, normalize = TRUE)
+
+# Adding labels to each document
+rownames(tfidf.mat) <- df$prof
+
+cosine <- function(a, b) {
+## t() transposes a matrix ensuring that vector `a' is multiplied ## by each row of matrix `b'
+numer <- apply(a * t(b), 2, sum)
+denom <- sqrt(sum(a^2)) * sqrt(apply(b^2, 1, sum))
+return(numer / denom)
+}
+```
+
+```{r, message=F}
+head(tfidf.mat)[,1:3]
+```
+
+## Implementing Page Rank
+
+```{r, message=F}
+library(igraph)
+cosine.adj <- matrix(0, 
+                     nrow = nrow(tfidf.mat), 
+                     ncol = nrow(tfidf.mat))
+rownames(cosine.adj) <- 
+  colnames(cosine.adj) <- 
+  rownames(tfidf.mat)
+
+head(cosine.adj)[,1:3]
+```
+
+## For Loop to Fill Each Observation
+
+```{r}
+for (i in 1:nrow(tfidf.mat)) {
+    cosine.adj[i, ] <- cosine(tfidf.mat[i,], tfidf.mat)
+    cosine.adj[i, df$phd[i] < df$phd] <- 0
+}
+head(cosine.adj)[,1:3]
+```
+
+## Diagonal Replacement and Graph
+
+```{r}
+diag(cosine.adj) <- 0 
+cosine.graph <- graph.adjacency(cosine.adj, 
+                                mode = "directed", 
+                                weighted = TRUE, 
+                                diag = FALSE)
+```
+
+## Results
+
+```{r}
+pr <- data.frame(country = colnames(cosine.adj),
+                 year = df$phd,
+                 pagerank = page.rank(cosine.graph)$vector)
+
+sort(pr$pagerank, decreasing = TRUE)[1:5]
+
+pr$country[pr$pagerank %in% sort(pr$pagerank, decreasing = TRUE)[1]]
+```
+
+## Summary
+
+- Page Rank can be implemented through `igraph`
+- Offers another way of detecting influence, using similarity instead of page visits
+- Unsupervised text analysis is useful at detecting patterns in data that is difficult for humans
+  - High-dimensionality
+  - Hard to interpret
+
+## Concluding Thoughts
+
+- A large goal of this course is to give you a framework to understand different methodologies and the challenges they tackle
+- Once your TF, always your TF 
+  - If you feel I am a good recommender, happy to write a rec letter
+  - If you need any advice about grad school, happy to talk 
+  - Also here to bounce research ideas! 
+- Remember to fill out Q scores! 
+
